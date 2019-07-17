@@ -1369,7 +1369,9 @@ let LOCALE_ID = DEFAULT_LOCALE_ID;
  * @param localeId
  */
 export function setLocaleId(localeId: string) {
-  LOCALE_ID = localeId.toLowerCase().replace(/_/g, '-');
+  if (localeId) {
+    LOCALE_ID = localeId.toLowerCase().replace(/_/g, '-');
+  }
 }
 
 /**

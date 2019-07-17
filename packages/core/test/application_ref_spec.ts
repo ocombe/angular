@@ -8,7 +8,7 @@
 
 import {DOCUMENT} from '@angular/common';
 import {ResourceLoader} from '@angular/compiler';
-import {APP_BOOTSTRAP_LISTENER, APP_INITIALIZER, Compiler, CompilerFactory, Component, InjectionToken, LOCALE_ID, NgModule, NgZone, PlatformRef, TemplateRef, Type, ViewChild, ViewContainerRef} from '@angular/core';
+import {APP_BOOTSTRAP_LISTENER, APP_INITIALIZER, Compiler, CompilerFactory, Component, Injectable, InjectionToken, LOCALE_ID, NgModule, NgZone, PlatformRef, TemplateRef, Type, ViewChild, ViewContainerRef} from '@angular/core';
 import {ApplicationRef} from '@angular/core/src/application_ref';
 import {ErrorHandler} from '@angular/core/src/error_handler';
 import {ComponentRef} from '@angular/core/src/linker/component_factory';
@@ -227,6 +227,53 @@ class SomeComponent {
                    createModule([{provide: APP_INITIALIZER, useValue: () => promise, multi: true}]))
                .then(_ => { expect(initializerDone).toBe(true); });
          }));
+
+      fit('should wait for APP_INITIALIZER and async services to set providers`', async() => {
+        @Injectable()
+        class InitService {
+          constructor() {}
+          init(): Promise<any> {
+            console.log('init');
+            return new Promise<any>(resolve => {
+              console.log('resolve');
+              setTimeout(() => resolve('fr-FR'), 100);
+            });
+          }
+        }
+
+        @Injectable()
+        class ValueService {
+          value !: string;
+        }
+
+        function getValueFactory(valueService: ValueService) {
+          console.log('factory');
+          return valueService.value;
+        }
+
+        function initFactory(initService: InitService, valueService: ValueService) {
+          return () => {
+            return initService.init().then((result) => {
+              console.log('init then');
+              valueService.value = result;
+            });
+          };
+        }
+
+        const testModule = createModule({
+          providers: [
+            ValueService, InitService, {
+              provide: APP_INITIALIZER,
+              useFactory: initFactory,
+              deps: [InitService, ValueService],
+              multi: true
+            },
+            {provide: LOCALE_ID, useFactory: getValueFactory, deps: [ValueService]}
+          ]
+        });
+        const app = await defaultPlatform.bootstrapModule(testModule);
+        expect(app.injector.get(LOCALE_ID)).toEqual('fr-FR');
+      });
 
       it('should rethrow sync errors even if the exceptionHandler is not rethrowing', async(() => {
            defaultPlatform
